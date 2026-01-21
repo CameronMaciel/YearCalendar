@@ -1,0 +1,2816 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Year Poster Planner (Offline)</title>
+  <style>
+    :root{
+      --ui-bg:#f6f7fb;
+      --ui-panel:#ffffff;
+      --ui-border:#d9dbe7;
+      --ui-text:#0b1020;
+      --ui-muted:#5b6275;
+      --ui-accent:#2563eb;
+      --ui-accent2:#1d4ed8;
+      --ui-danger:#b91c1c;
+      --ui-good:#047857;
+      --shadow: 0 8px 24px rgba(10,15,30,.10);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    *{ box-sizing:border-box; }
+    html, body { height:100%; }
+    body{
+      margin:0;
+      font-family: var(--sans);
+      background: var(--ui-bg);
+      color: var(--ui-text);
+      overflow:hidden;
+    }
+    #app{
+      display:grid;
+      grid-template-columns: 340px 1fr 320px;
+      height:100%;
+      width:100%;
+    }
+    #sidebar{
+      background: var(--ui-panel);
+      border-right: 1px solid var(--ui-border);
+      padding: 14px 14px 18px;
+      overflow:auto;
+    }
+
+    #inspector{
+      background: var(--ui-panel);
+      border-left: 1px solid var(--ui-border);
+      padding: 14px 14px 18px;
+      overflow:auto;
+    }
+#main{
+      position:relative;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+    }
+    #topbar{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      padding:10px 12px;
+      border-bottom:1px solid var(--ui-border);
+      background: rgba(255,255,255,.7);
+      backdrop-filter: blur(8px);
+    }
+    #posterWrap{
+      flex:1;
+      overflow:auto;
+      position:relative;
+      background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(245,246,252,.65));
+    }
+    #posterInner{
+      transform-origin: 0 0;
+      width: max-content;
+      height: max-content;
+      padding: 14px;
+    }
+    svg{ display:block; }
+
+    /* Prevent accidental text selection inside the poster (especially SVG <text>) */
+    #posterWrap, #posterWrap *{
+      -webkit-user-select:none;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    #posterSvg{ touch-action:none; }
+    #posterSvg text{
+      pointer-events:none;
+    }
+
+    /* But allow selection in sidebar inputs */
+    #sidebar, #sidebar *,
+    #inspector, #inspector *{
+      -webkit-user-select:text;
+      user-select:text;
+    }
+    #sidebar button, #sidebar .btn, #sidebar label,
+    #inspector button, #inspector .btn, #inspector label{
+      -webkit-user-select:none;
+      user-select:none;
+    }
+
+    .section{
+      padding: 10px 0 12px;
+      border-bottom: 1px solid var(--ui-border);
+    }
+    .section:last-child{ border-bottom:none; }
+    .h{
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: .2px;
+      margin: 2px 0 10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .row{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:8px;
+    }
+    .grid3{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap:8px;
+    }
+    label{
+      display:block;
+      font-size: 12px;
+      color: var(--ui-muted);
+      margin-bottom:4px;
+    }
+    input, select, textarea{
+      width:100%;
+      font-size:13px;
+      padding:8px 10px;
+      border:1px solid var(--ui-border);
+      border-radius:10px;
+      outline:none;
+      background:#fff;
+      color: var(--ui-text);
+    }
+    input:focus, select:focus, textarea:focus{
+      border-color: rgba(37,99,235,.65);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .btn{
+      appearance:none;
+      border:1px solid var(--ui-border);
+      background:#fff;
+      color: var(--ui-text);
+      padding:8px 10px;
+      font-size:13px;
+      font-weight:700;
+      border-radius:10px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .btn:hover{ border-color:#c7cbe0; }
+    .btn.primary{
+      background: var(--ui-accent);
+      border-color: var(--ui-accent);
+      color:#fff;
+    }
+    .btn.primary:hover{ background: var(--ui-accent2); border-color: var(--ui-accent2); }
+    .btn.danger{
+      background: #fff;
+      border-color: rgba(185,28,28,.35);
+      color: var(--ui-danger);
+    }
+    .btn.small{ padding:6px 8px; font-size:12px; border-radius:9px; }
+    .hint{
+      font-size:12px;
+      color: var(--ui-muted);
+      line-height:1.35;
+      margin-top:6px;
+    }
+    .warn{
+      white-space:pre-line;
+      font-size:12px;
+      color: #7c2d12;
+      background: #ffedd5;
+      border:1px solid #fed7aa;
+      padding:8px 10px;
+      border-radius:10px;
+      margin-top:8px;
+    }
+    .ok{
+      white-space:pre-line;
+      font-size:12px;
+      color:#064e3b;
+      background:#d1fae5;
+      border:1px solid #a7f3d0;
+      padding:8px 10px;
+      border-radius:10px;
+      margin-top:8px;
+    }
+
+    .pill{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:8px 10px;
+      border:1px solid var(--ui-border);
+      border-radius:12px;
+      margin-top:8px;
+      background:#fff;
+    }
+    .pill .left{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:0;
+    }
+    .dot{
+      width:10px;
+      height:10px;
+      border-radius:999px;
+      background:#aaa;
+      flex:0 0 auto;
+    }
+    .pill .title{
+      font-weight:800;
+      font-size:13px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      max-width: 170px;
+    }
+    .pill .sub{
+      font-size:12px;
+      color: var(--ui-muted);
+      margin-top:1px;
+    }
+
+    .mono{
+      font-family: var(--mono);
+      font-size:12px;
+    }
+
+    /* Drag lock (pro UX) */
+    body.dragging{
+      cursor: grabbing !important;
+    }
+    body.dragging, body.dragging *{
+      -webkit-user-select:none !important;
+      user-select:none !important;
+    }
+
+    /* Print: remove sidebar and transforms */
+    @media print{
+      body{ background:#fff; overflow:visible; }
+      #app{ display:block; height:auto; }
+      #sidebar, #topbar, #inspector{ display:none !important; }
+      #posterWrap{ overflow:visible !important; }
+      #posterInner{ transform:none !important; padding:0 !important; }
+    }
+  </style>
+  <style id="pageSizeStyle"></style>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="section">
+        <div class="h">Document</div>
+        <div class="grid2">
+          <div>
+            <label>Year</label>
+            <input id="yearInput" type="number" min="1970" max="2100" />
+          </div>
+          <div>
+            <label>Paper preset</label>
+            <select id="presetSelect"></select>
+          </div>
+        </div>
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <label>Poster height (in)</label>
+            <input id="posterHeightIn" type="number" step="0.05" min="1" />
+          </div>
+          <div>
+            <label>Default day width (in)</label>
+            <input id="dayWidthIn" type="number" step="0.01" min="0.05" />
+          </div>
+        </div>
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <label>Month label width (in)</label>
+            <input id="monthLabelWidthIn" type="number" step="0.05" min="0.3" />
+          </div>
+          <div>
+            <label>Margins (in)</label>
+            <input id="marginIn" type="number" step="0.05" min="0" />
+          </div>
+        </div>
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <label>Grid gap (in)</label>
+            <input id="gapIn" type="number" step="0.005" min="0" />
+          </div>
+          <div>
+            <label>Header height (in)</label>
+            <input id="headerIn" type="number" step="0.05" min="0" />
+          </div>
+        </div>
+
+        <div class="grid3" style="margin-top:8px;">
+          <div>
+            <label>Day label (pt)</label>
+            <input id="dayLabelPt" type="number" step="0.5" min="3" />
+          </div>
+          <div>
+            <label>Event text (pt)</label>
+            <input id="eventFontPt" type="number" step="0.5" min="3" />
+          </div>
+          <div>
+            <label>Title (pt)</label>
+            <input id="titleFontPt" type="number" step="0.5" min="6" />
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <label>Event height (in)</label>
+            <input id="eventHeightIn" type="number" step="0.01" min="0.05" placeholder="auto" />
+          </div>
+          <div>
+            <label>Apply global style to all events</label>
+            <div class="row" style="gap:8px; flex-wrap:wrap;">
+              <button class="btn small" id="applyEventFontAllBtn">Apply text size</button>
+              <button class="btn small" id="applyEventHeightAllBtn">Apply height</button>
+              <button class="btn small" id="applyEventAllBtn">Apply both</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <label>Event label mode</label>
+            <select id="eventLabelMode">
+              <option value="auto">Auto-fit</option>
+              <option value="always">Always</option>
+              <option value="never">Never</option>
+            </select>
+          </div>
+          <div>
+            <label>Min event font (pt)</label>
+            <input id="minEventFontPt" type="number" step="0.5" min="2" />
+          </div>
+        </div>
+
+
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <label>Grid line color</label>
+            <input id="gridLineColor" type="color" value="#d1d5db" style="height:36px; padding:0 6px;" />
+          </div>
+          <div>
+            <label>Grid line width (px)</label>
+            <input id="gridLineWidthPx" type="number" step="0.25" min="0.25" max="4" />
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <label>Event stack gap (px)</label>
+            <input id="eventGapPx" type="number" step="0.5" min="0" max="20" />
+          </div>
+          <div>
+            <label>Event padding (px)</label>
+            <input id="eventPadPx" type="number" step="0.5" min="0" max="20" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" id="autoExpandLabelsBtn">Auto expand long titles</button>
+        </div>
+        <div class="hint">Widens only the days that need it (adds per-day width overrides) so long event titles can be readable without shrinking font size. Best for roll presets (unlimited length).</div>
+
+        <div id="sizeWarn" class="warn" style="display:none;"></div>
+
+        <div class="row" style="margin-top:10px; justify-content:space-between;">
+          <button class="btn" id="fitWidthBtn">Fit width</button>
+          <div class="row" style="gap:6px;">
+            <label style="margin:0; font-size:12px; color:var(--ui-muted);">Zoom</label>
+            <input id="zoomRange" type="range" min="0.15" max="2.5" step="0.01" style="width:120px;" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px; gap:8px; flex-wrap:wrap;">
+          <button class="btn primary" id="exportSvgBtn">Export SVG</button>
+          <button class="btn" id="exportJsonBtn">Export JSON</button>
+          <button class="btn" id="importJsonBtn">Import JSON</button>
+          <input id="importFile" type="file" accept=".json,application/json" style="display:none;" />
+        </div>
+
+        <div class="hint">
+          Layout: <b>Months on the left</b>, days 1–31 across. Each cell shows <b>“1st Mon”</b> etc. Click a day to select it, then drag the blue handle to resize that day’s cell width/height.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="h">Month row height weights</div>
+        <div class="hint" style="margin-top:-2px;">Bigger number = taller month row (useful when a month needs more space).</div>
+        <div id="weightsGrid" class="grid3" style="margin-top:8px;"></div>
+        <div class="grid2" style="margin-top:10px;">
+          <div>
+            <label>Row height mode</label>
+            <select id="rowHeightMode">
+              <option value="fill">Fill poster height</option>
+              <option value="compact">Compact to content</option>
+            </select>
+          </div>
+          <div>
+            <label>Auto size</label>
+            <button class="btn" id="autoMinRowsBtn">Auto size rows to minimum</button>
+          </div>
+        </div>
+        <div class="hint">Compact mode leaves blank space at the bottom if months don’t need the full height. If content can’t fit, increase poster height or reduce event sizes.</div>
+      </div>
+
+      <div class="section">
+        <div class="h">Categories</div>
+        <div class="grid2">
+          <div>
+            <label>New category</label>
+            <input id="newCatName" placeholder="e.g., Work" />
+          </div>
+          <div>
+            <label>Color</label>
+            <input id="newCatColor" type="color" value="#2563eb" style="height:36px; padding:0 6px;" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn small primary" id="addCatBtn">Add category</button>
+        </div>
+        <div id="catsList"></div>
+      </div>
+
+      <div class="section">
+        <div class="h">Add event</div>
+        <div>
+          <label>Title</label>
+          <input id="newEvTitle" placeholder="Event title" />
+        </div>
+        <div class="grid2" style="margin-top:8px;">
+          <div>
+            <label>Start</label>
+            <input id="newEvStart" type="date" />
+          </div>
+          <div>
+            <label>End</label>
+            <input id="newEvEnd" type="date" />
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <label>Category</label>
+          <select id="newEvCat"></select>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn primary" id="addEventBtn">Add event</button>
+        </div>
+        <div class="hint">Drag events on the poster to move them. Use the blue handles to resize days / event spans / event height.</div>
+      </div>
+
+    </aside>
+
+    <main id="main">
+      <div id="topbar">
+        <div class="row" style="gap:10px;">
+          <div class="mono" id="posterInfo"></div>
+        </div>
+        <div style="flex:1;"></div>
+        <button class="btn" id="resetZoomBtn">100%</button>
+        <button class="btn" id="printBtn">Print</button>
+      </div>
+      <div id="posterWrap">
+        <div id="posterInner">
+          <svg id="posterSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+      </div>
+    </main>
+
+    <aside id="inspector">
+      <div class="section">
+        <div class="h">Inspector</div>
+        <div class="hint">Click an <b>event</b> or a <b>day cell</b> on the calendar to see and edit details here.</div>
+      </div>
+
+      <div class="section">
+        <div class="h">Selected event</div>
+        <div id="selEvNone" class="hint">Click an event block to edit it.</div>
+        <div id="selEvPanel" style="display:none;">
+          <div class="mono" id="selEvTitle"></div>
+          <div class="grid2" style="margin-top:8px;">
+            <div>
+              <label>Text size (pt)</label>
+              <input id="selEvFontPt" type="number" step="0.5" min="2" />
+            </div>
+            <div>
+              <label>Height (in)</label>
+              <input id="selEvHeightIn" type="number" step="0.02" min="0.04" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button class="btn small" id="applyEvStyleBtn">Apply</button>
+            <button class="btn small danger" id="deleteEvBtn">Delete event</button>
+          </div>
+          <div class="hint">On canvas: drag left/right handles to extend across days. Drag bottom handle to change height.</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="h">Selected day</div>
+        <div id="selNone" class="hint">Click a day cell to edit its size.</div>
+        <div id="selPanel" style="display:none;">
+          <div class="mono" id="selDate"></div>
+          <div class="grid2" style="margin-top:8px;">
+            <div>
+              <label>Width override (in)</label>
+              <input id="selCellW" type="number" step="0.01" min="0.05" />
+            </div>
+            <div>
+              <label>Height override (in)</label>
+              <input id="selCellH" type="number" step="0.05" min="0.05" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button class="btn small" id="applyCellBtn">Apply</button>
+            <button class="btn small danger" id="clearCellBtn">Clear override</button>
+          </div>
+          <div class="hint">Height override increases the <b>month row height allocation</b> so stacked events have more room.</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="h">Find event</div>
+        <div>
+          <label>Search</label>
+          <input id="eventSearch" placeholder="Type to search title or date (e.g., 2026-03)" />
+        </div>
+        <div id="eventSearchHint" class="hint">This list stays empty until you search (so it doesn’t become a huge scrolling list).</div>
+        <div id="eventsList"></div>
+      </div>
+    </aside>
+
+  </div>
+
+<script>
+(() => {
+  'use strict';
+
+  // --- Constants
+  const DPI = 96;
+
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  const PAGE_PRESETS = [
+    { id:"roll-24", kind:"roll", name:"Roll: 24\" tall × unlimited length", h:24 },
+    { id:"roll-18", kind:"roll", name:"Roll: 18\" tall × unlimited length", h:18 },
+    { id:"roll-11", kind:"roll", name:"Roll: 11\" tall × unlimited length", h:11 },
+
+    { id:"sheet-letter-land", kind:"sheet", name:"Sheet: 8.5×11 (Landscape)", w:11, h:8.5 },
+    { id:"sheet-letter-port", kind:"sheet", name:"Sheet: 8.5×11 (Portrait)", w:8.5, h:11 },
+
+    { id:"sheet-11x17-land", kind:"sheet", name:"Sheet: 11×17 (Landscape)", w:17, h:11 },
+    { id:"sheet-11x17-port", kind:"sheet", name:"Sheet: 11×17 (Portrait)", w:11, h:17 },
+
+    { id:"sheet-24x36-land", kind:"sheet", name:"Sheet: 24×36 (Landscape)", w:36, h:24 },
+    { id:"sheet-24x36-port", kind:"sheet", name:"Sheet: 24×36 (Portrait)", w:24, h:36 },
+
+    { id:"custom", kind:"custom", name:"Custom (manual)" },
+  ];
+
+  // --- DOM
+  const yearInput = document.getElementById('yearInput');
+  const presetSelect = document.getElementById('presetSelect');
+  const posterHeightInEl = document.getElementById('posterHeightIn');
+  const dayWidthInEl = document.getElementById('dayWidthIn');
+  const monthLabelWidthInEl = document.getElementById('monthLabelWidthIn');
+  const marginInEl = document.getElementById('marginIn');
+  const gapInEl = document.getElementById('gapIn');
+  const headerInEl = document.getElementById('headerIn');
+  const dayLabelPtEl = document.getElementById('dayLabelPt');
+  const eventFontPtEl = document.getElementById('eventFontPt');
+  const titleFontPtEl = document.getElementById('titleFontPt');
+  const eventHeightInEl = document.getElementById('eventHeightIn');
+  const applyEventFontAllBtn = document.getElementById('applyEventFontAllBtn');
+  const applyEventHeightAllBtn = document.getElementById('applyEventHeightAllBtn');
+  const applyEventAllBtn = document.getElementById('applyEventAllBtn');
+  const eventLabelModeEl = document.getElementById('eventLabelMode');
+  const minEventFontPtEl = document.getElementById('minEventFontPt');
+  const gridLineColorEl = document.getElementById('gridLineColor');
+  const gridLineWidthPxEl = document.getElementById('gridLineWidthPx');
+  const eventGapPxEl = document.getElementById('eventGapPx');
+  const eventPadPxEl = document.getElementById('eventPadPx');
+  const autoExpandLabelsBtn = document.getElementById('autoExpandLabelsBtn');
+
+  const sizeWarn = document.getElementById('sizeWarn');
+  const fitWidthBtn = document.getElementById('fitWidthBtn');
+  const zoomRange = document.getElementById('zoomRange');
+  const resetZoomBtn = document.getElementById('resetZoomBtn');
+  const printBtn = document.getElementById('printBtn');
+
+  const exportSvgBtn = document.getElementById('exportSvgBtn');
+  const exportJsonBtn = document.getElementById('exportJsonBtn');
+  const importJsonBtn = document.getElementById('importJsonBtn');
+  const importFile = document.getElementById('importFile');
+
+  const weightsGrid = document.getElementById('weightsGrid');
+  const rowHeightModeEl = document.getElementById('rowHeightMode');
+  const autoMinRowsBtn = document.getElementById('autoMinRowsBtn');
+
+  const selNone = document.getElementById('selNone');
+  const selPanel = document.getElementById('selPanel');
+  const selDate = document.getElementById('selDate');
+  const selCellW = document.getElementById('selCellW');
+  const selCellH = document.getElementById('selCellH');
+  const applyCellBtn = document.getElementById('applyCellBtn');
+  const clearCellBtn = document.getElementById('clearCellBtn');
+
+  const newCatName = document.getElementById('newCatName');
+  const newCatColor = document.getElementById('newCatColor');
+  const addCatBtn = document.getElementById('addCatBtn');
+  const catsList = document.getElementById('catsList');
+
+  const newEvTitle = document.getElementById('newEvTitle');
+  const newEvStart = document.getElementById('newEvStart');
+  const newEvEnd = document.getElementById('newEvEnd');
+  const newEvCat = document.getElementById('newEvCat');
+  const addEventBtn = document.getElementById('addEventBtn');
+
+  const eventsList = document.getElementById('eventsList');
+  const eventSearch = document.getElementById('eventSearch');
+  const eventSearchHint = document.getElementById('eventSearchHint');
+
+  const selEvNone = document.getElementById('selEvNone');
+  const selEvPanel = document.getElementById('selEvPanel');
+  const selEvTitle = document.getElementById('selEvTitle');
+  const selEvFontPt = document.getElementById('selEvFontPt');
+  const selEvHeightIn = document.getElementById('selEvHeightIn');
+  const applyEvStyleBtn = document.getElementById('applyEvStyleBtn');
+  const deleteEvBtn = document.getElementById('deleteEvBtn');
+
+  const posterWrap = document.getElementById('posterWrap');
+  const posterInner = document.getElementById('posterInner');
+  const posterInfo = document.getElementById('posterInfo');
+  const svg = document.getElementById('posterSvg');
+  const pageSizeStyle = document.getElementById('pageSizeStyle');
+
+  // --- Utilities
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+  function px(inches){ return inches * DPI; }
+  function inches(pxv){ return pxv / DPI; }
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function isoDateStr(y, m, d){
+    return `${y}-${pad2(m+1)}-${pad2(d)}`;
+  }
+  function parseIsoDate(s){
+    if(!s || typeof s !== 'string') return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if(!m) return null;
+    const y = +m[1], mo = +m[2]-1, d = +m[3];
+    const dt = new Date(y, mo, d);
+    dt.setHours(0,0,0,0);
+    if(dt.getFullYear() !== y || dt.getMonth() !== mo || dt.getDate() !== d) return null;
+    return dt;
+  }
+  function daysInMonth(y, m){
+    return new Date(y, m+1, 0).getDate();
+  }
+  function addDays(dt, n){
+    const d = new Date(dt);
+    d.setDate(d.getDate() + n);
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  function daysDiff(a, b){
+    return Math.round((a.getTime() - b.getTime()) / 86400000);
+  }
+  function weekdayShort(dt){
+    return WEEKDAYS[dt.getDay()];
+  }
+  function ordinal(n){
+    const s = ["th","st","nd","rd"];
+    const v = n % 100;
+    return n + (s[(v-20)%10] || s[v] || s[0]);
+  }
+  function uid(){
+    return Math.random().toString(36).slice(2,10) + "-" + Date.now().toString(36);
+  }
+  function isFiniteNumber(x){ return typeof x === 'number' && isFinite(x); }
+
+  // --- Text measurement (used for minimum day-label cell width)
+  const FONT_FAMILY = "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif";
+  const _measureCanvas = document.createElement("canvas");
+  const _measureCtx = (_measureCanvas.getContext ? _measureCanvas.getContext("2d") : null);
+  let _minDayLabelCache = { year:null, pt:null, px:null };
+
+  function textWidthPx(text, fontPt, weight=800){
+    if(_measureCtx){
+      _measureCtx.font = `${weight} ${fontPt}pt ${FONT_FAMILY}`;
+      return _measureCtx.measureText(String(text)).width;
+    }
+    // fallback approximation
+    const fontPx = (fontPt * DPI) / 72;
+    return String(text).length * (fontPx * 0.62);
+  }
+
+  function minDayLabelWidthPx(year, dayLabelPt){
+    if(_minDayLabelCache.year === year && _minDayLabelCache.pt === dayLabelPt && isFiniteNumber(_minDayLabelCache.px)){
+      return _minDayLabelCache.px;
+    }
+    let maxW = 0;
+    for(let m=0;m<12;m++){
+      const dim = daysInMonth(year, m);
+      for(let d=1; d<=dim; d++){
+        const dt = new Date(year, m, d); dt.setHours(0,0,0,0);
+        const label = `${ordinal(d)} ${weekdayShort(dt)}`;
+        const w = textWidthPx(label, dayLabelPt, 800);
+        if(w > maxW) maxW = w;
+      }
+    }
+    const required = maxW + 10; // padding (4 left + ~6 right)
+    _minDayLabelCache = { year, pt: dayLabelPt, px: required };
+    return required;
+  }
+
+  function luminance(hex){
+    const c = hex.replace('#','');
+    const r = parseInt(c.slice(0,2),16)/255;
+    const g = parseInt(c.slice(2,4),16)/255;
+    const b = parseInt(c.slice(4,6),16)/255;
+    // relative luminance
+    const f = (u)=> (u <= 0.03928) ? (u/12.92) : Math.pow((u+0.055)/1.055,2.4);
+    return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b);
+  }
+  function textColorFor(bg){
+    return luminance(bg) > 0.52 ? "#0b1020" : "#ffffff";
+  }
+
+  function wrapLines(text, maxChars, maxLines){
+    const words = String(text||"").split(/\s+/).filter(Boolean);
+    if(!words.length) return ["(event)"];
+    const lines = [];
+    let line = "";
+    for(const w of words){
+      if(!line){
+        line = w;
+      } else if((line + " " + w).length <= maxChars){
+        line += " " + w;
+      } else {
+        lines.push(line);
+        line = w;
+        if(lines.length >= maxLines) break;
+      }
+    }
+    if(lines.length < maxLines && line) lines.push(line);
+    // If still too long, hard-truncate last line
+    if(lines.length){
+      const last = lines[lines.length-1];
+      if(last.length > maxChars){
+        lines[lines.length-1] = last.slice(0, Math.max(1, maxChars-1)) + "…";
+      }
+    }
+    return lines;
+  }
+
+
+  // --- Auto expand (pro feature)
+  // Widens day cells (adds width overrides) so long titles can fit without shrinking text.
+  function linesNeededFor(text, maxChars){
+    const words = String(text||"").split(/\s+/).filter(Boolean);
+    if(!words.length) return 1;
+    if(maxChars <= 1) return words.length;
+    let lines = 0;
+    let line = "";
+    for(const w of words){
+      const wLen = w.length;
+      // If a single word exceeds maxChars, it still forces its own line in this simple model.
+      if(!line){
+        line = w;
+      } else if((line.length + 1 + wLen) <= maxChars){
+        line += " " + w;
+      } else {
+        lines++;
+        line = w;
+      }
+    }
+    if(line) lines++;
+    return Math.max(1, lines);
+  }
+
+  function requiredMaxCharsForLines(text, maxLines){
+    const t = String(text||"").trim();
+    if(!t) return 3;
+    const words = t.split(/\s+/).filter(Boolean);
+    if(!words.length) return 3;
+
+    const maxWord = words.reduce((m,w)=>Math.max(m, w.length), 1);
+    let lo = Math.max(3, maxWord);
+    let hi = Math.max(lo, t.length);
+
+    while(lo < hi){
+      const mid = Math.floor((lo + hi) / 2);
+      if(linesNeededFor(t, mid) <= maxLines) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  }
+
+  function autoExpandLongTitles(){
+    const MAX_DAY_W_IN = 6;   // guardrail so a single day can't become absurdly wide
+    const MAX_PASSES = 4;     // iterative because changing widths affects later events
+    const y = state.year;
+
+    let updates = 0;
+
+    for(let pass=0; pass<MAX_PASSES; pass++){
+      const layout = buildLayout();
+
+      let changed = false;
+
+      for(let m=0; m<12; m++){
+        const dim = daysInMonth(y, m);
+        const cells = layout.cellsByMonth[m];
+        const segs = layout.segmentsByMonth[m] || [];
+
+        for(const seg of segs){
+          const startD = clamp(seg.startDay, 1, dim);
+          const endD = clamp(seg.endDay, 1, dim);
+          const startCell = cells[startD-1];
+          const endCell = cells[endD-1];
+          if(!startCell || !endCell) continue;
+
+          const title = seg.title || "";
+          if(!title.trim()) continue;
+
+          // Current pixel width of this event segment across its day span
+          const wPx = Math.max(2, (endCell.x + endCell.w) - startCell.x - 2);
+
+          const fontPx = seg.fontPx || layout.eventFontPxDefault;
+          const hPx = seg.hPx;
+
+          const pad = isFiniteNumber(state.settings.eventPadPx) ? Number(state.settings.eventPadPx) : 2.0;
+          const lineH = fontPx * 1.12;
+          const maxLines = Math.max(1, Math.floor((hPx - pad*2) / lineH));
+
+          // How many characters per line does the current width support?
+          const maxCharsNow = Math.max(3, Math.floor((wPx - pad*2) / (fontPx * 0.62)));
+          const neededLinesNow = linesNeededFor(title, maxCharsNow);
+
+          if(neededLinesNow <= maxLines) continue;
+
+          // Compute the minimum chars/line required so the title fits within maxLines
+          const reqMaxChars = requiredMaxCharsForLines(title, maxLines);
+          const reqWpx = pad*2 + reqMaxChars * (fontPx * 0.62);
+
+          if(reqWpx <= wPx + 0.5) continue;
+
+          const deltaPx = reqWpx - wPx + 2;
+
+          // Apply the expansion to the event's START day cell (keeps behavior simple + predictable)
+          const dateStr = isoDateStr(y, m, startD);
+
+          if(!state.cellOverrides[dateStr]) state.cellOverrides[dateStr] = {};
+          const ov = state.cellOverrides[dateStr];
+
+          const curWpx = px(isFiniteNumber(ov.wIn) ? Number(ov.wIn) : state.settings.dayWidthIn);
+          const newWpx = clamp(curWpx + deltaPx, px(0.05), px(MAX_DAY_W_IN));
+
+          if(newWpx > curWpx + 0.25){
+            ov.wIn = inches(newWpx);
+            changed = true;
+            updates++;
+          }
+        }
+      }
+
+      if(!changed) break;
+    }
+
+    saveState();
+    scheduleRenderAll();
+
+    if(updates){
+      alert(`Auto expand complete. Updated ${updates} day width overrides.\n\nTip: Click a day → adjust its Width override for fine tuning.`);
+    } else {
+      alert("Auto expand: no changes needed (titles already fit).");
+    }
+  }
+
+  function download(filename, blob){
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  }
+
+  // --- State
+  const STORAGE_KEY = "yearPosterPlanner-v3";
+  const defaultState = () => {
+    const y = new Date().getFullYear();
+    return {
+      year: y,
+      presetId: "roll-24",
+      zoom: 1,
+      settings: {
+        posterHeightIn: 24,
+        monthLabelWidthIn: 0.95,
+        dayWidthIn: 0.45,
+        marginIn: 0.25,
+        gapIn: 0.03,
+        headerIn: 0.45,
+
+        dayLabelPt: 8.5,
+        eventFontPt: 8.5,
+        eventHeightIn: null,
+        titleFontPt: 16,
+
+        minEventFontPt: 5,
+        eventLabelMode: "auto",
+
+        gridLineColor: "#d1d5db",
+        gridLineWidthPx: 1,
+
+        minMonthRowIn: 0.7,
+        rowHeightMode: "fill",
+        eventGapPx: 1.5, // vertical gap in px (not inches)
+        eventPadPx: 2.0, // padding inside event rect
+      },
+      monthWeights: Array.from({length:12}, ()=>1),
+      cellOverrides: {}, // dateStr -> {wIn, hIn}
+      categories: [
+        { id:"cat-"+uid(), name:"Personal", color:"#2563eb" },
+        { id:"cat-"+uid(), name:"Work", color:"#16a34a" },
+        { id:"cat-"+uid(), name:"Travel", color:"#f59e0b" },
+      ],
+      events: [
+        // Example event
+        // { id:"ev-"+uid(), title:"Example", start:`${y}-01-03`, end:`${y}-01-05`, categoryId:"...", style:{fontPt:9, heightIn:0.18} }
+      ],
+      selected: { type:null, id:null, month:null },
+    };
+  };
+
+  let state = loadState();
+  function migrateFromOldState(old, d){
+    // Best-effort migration from older planner files (keeps categories + events + overrides)
+    const out = JSON.parse(JSON.stringify(d));
+
+    if(typeof old.year === "number" && isFinite(old.year)) out.year = old.year;
+
+    if(old.ui && typeof old.ui.zoom === "number" && isFinite(old.ui.zoom)) out.zoom = clamp(old.ui.zoom, 0.15, 2.5);
+    else if(typeof old.zoom === "number" && isFinite(old.zoom)) out.zoom = clamp(old.zoom, 0.15, 2.5);
+
+    if(Array.isArray(old.categories) && old.categories.length){
+      out.categories = old.categories.map(c => ({
+        id: c.id || ("cat-"+uid()),
+        name: c.name || "Category",
+        color: c.color || "#2563eb",
+      }));
+    }
+
+    if(Array.isArray(old.events)){
+      out.events = old.events.map(ev => ({
+        id: ev.id || ("ev-"+uid()),
+        title: ev.title || "(event)",
+        start: ev.start,
+        end: ev.end || ev.start,
+        categoryId: ev.categoryId || (out.categories[0] ? out.categories[0].id : null),
+        style: (ev.style && typeof ev.style === "object") ? { ...ev.style } : {},
+      })).filter(ev => typeof ev.start === "string");
+    }
+
+    if(old.cellOverrides && typeof old.cellOverrides === "object"){
+      out.cellOverrides = old.cellOverrides;
+    }
+
+    // Map a couple settings if present
+    if(old.settings && typeof old.settings === "object"){
+      if(typeof old.settings.marginIn === "number" && isFinite(old.settings.marginIn)) out.settings.marginIn = old.settings.marginIn;
+      if(typeof old.settings.gridGapIn === "number" && isFinite(old.settings.gridGapIn)) out.settings.gapIn = old.settings.gridGapIn;
+      if(typeof old.settings.labelGutterIn === "number" && isFinite(old.settings.labelGutterIn)) out.settings.monthLabelWidthIn = old.settings.labelGutterIn;
+    }
+
+    out.presetId = "custom";
+    out.selected = { type:null, id:null, month:null };
+    return out;
+  }
+
+  function loadState(){
+    const d = defaultState();
+    try{
+      const rawNew = localStorage.getItem(STORAGE_KEY);
+      if(rawNew){
+        const s = JSON.parse(rawNew);
+        if(s && typeof s === 'object'){
+          return {
+            ...d,
+            ...s,
+            settings: { ...d.settings, ...(s.settings||{}) },
+            monthWeights: Array.isArray(s.monthWeights) && s.monthWeights.length===12 ? s.monthWeights : d.monthWeights,
+            categories: Array.isArray(s.categories) && s.categories.length ? s.categories : d.categories,
+            events: Array.isArray(s.events) ? s.events : d.events,
+            cellOverrides: s.cellOverrides && typeof s.cellOverrides === 'object' ? s.cellOverrides : d.cellOverrides,
+            selected: s.selected && typeof s.selected === 'object' ? s.selected : d.selected,
+          };
+        }
+      }
+
+      // Try migrate from older keys
+      const OLD_KEYS = ["yearPosterPlanner_v1", "yearPosterPlanner-v2", "yearPosterPlanner_v2"];
+      for(const k of OLD_KEYS){
+        const rawOld = localStorage.getItem(k);
+        if(!rawOld) continue;
+        const old = JSON.parse(rawOld);
+        if(!old || typeof old !== 'object') continue;
+
+        const migrated = migrateFromOldState(old, d);
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated)); }catch(_){}
+        return migrated;
+      }
+
+      return d;
+    }catch(err){
+      console.warn("Failed to load state:", err);
+      return d;
+    }
+  }
+
+  function saveState(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(err){
+      console.warn("Failed to save state:", err);
+    }
+  }
+
+  // --- Presets
+  function presetById(id){
+    return PAGE_PRESETS.find(p => p.id === id) || PAGE_PRESETS[0];
+  }
+  function computeDayWidthToFit(sheetWIn){
+    const s = state.settings;
+    const totalGapsIn = s.gapIn * 31 + s.gapIn; // between label and day1 + between days (approx)
+    const avail = sheetWIn - 2*s.marginIn - s.monthLabelWidthIn - totalGapsIn;
+    return avail / 31;
+  }
+  function applyPreset(presetId){
+    const p = presetById(presetId);
+    state.presetId = p.id;
+
+    if(p.kind === "sheet"){
+      // fixed page size
+      state.settings.posterHeightIn = p.h;
+      const dw = computeDayWidthToFit(p.w);
+      if(isFiniteNumber(dw)) state.settings.dayWidthIn = clamp(dw, 0.06, 3);
+
+      // scale fonts a bit with day width
+      const base = state.settings.dayWidthIn;
+      state.settings.dayLabelPt = clamp(base * 20, 5, 10);
+      state.settings.eventFontPt = clamp(base * 20, 5, 10);
+      state.settings.titleFontPt = clamp(12 + base*12, 10, 18);
+
+      // header small for sheets
+      state.settings.headerIn = clamp(state.settings.headerIn, 0, 0.6);
+
+      pageSizeStyle.textContent = `@media print{ @page{ size: ${p.w}in ${p.h}in; margin: 0; } }`;
+    } else if(p.kind === "roll"){
+      state.settings.posterHeightIn = p.h;
+      pageSizeStyle.textContent = "@media print{ @page{ margin: 0; } }";
+    } else {
+      pageSizeStyle.textContent = "@media print{ @page{ margin: 0; } }";
+    }
+    saveState();
+    scheduleRenderAll();
+    setTimeout(()=>zoomToFitWidth(), 50);
+  }
+
+  // --- Layout + Packing
+  function normalizeEvent(ev){
+    const y = state.year;
+    const start = parseIsoDate(ev.start);
+    const end = parseIsoDate(ev.end || ev.start);
+    if(!start || !end) return null;
+
+    const yearStart = new Date(y,0,1); yearStart.setHours(0,0,0,0);
+    const yearEnd = new Date(y,11,31); yearEnd.setHours(0,0,0,0);
+
+    let s = start, e = end;
+    if(e < s){ const tmp = s; s = e; e = tmp; }
+
+    if(e < yearStart || s > yearEnd) return null;
+
+    if(s < yearStart) s = yearStart;
+    if(e > yearEnd) e = yearEnd;
+
+    return { start:s, end:e };
+  }
+
+  function buildSegmentsByMonth(){
+    const y = state.year;
+    const segsByMonth = Array.from({length:12}, ()=>[]);
+    for(const ev of state.events){
+      const norm = normalizeEvent(ev);
+      if(!norm) continue;
+      const { start, end } = norm;
+
+      const style = ev.style || {};
+      const fontPt = isFiniteNumber(style.fontPt) ? Number(style.fontPt) : state.settings.eventFontPt;
+      const fontPx = (fontPt * DPI) / 72;
+
+      const defaultH = Math.max(10, fontPx * 1.25 + 6);
+      let hPx;
+      if(isFiniteNumber(style.heightIn)){
+        hPx = px(Number(style.heightIn));
+      } else if(isFiniteNumber(state.settings.eventHeightIn)){
+        hPx = px(Number(state.settings.eventHeightIn));
+      } else {
+        hPx = defaultH;
+      }
+
+      let cur = new Date(start); cur.setHours(0,0,0,0);
+      while(cur <= end){
+        const m = cur.getMonth();
+        const dim = daysInMonth(y, m);
+        const startDay = (cur.getMonth() === start.getMonth()) ? start.getDate() : 1;
+
+        // last day in this month within the event
+        const monthEnd = new Date(y, m, dim); monthEnd.setHours(0,0,0,0);
+        const segEndDate = (end < monthEnd) ? end : monthEnd;
+        const endDay = segEndDate.getDate();
+
+        segsByMonth[m].push({
+          eventId: ev.id,
+          title: ev.title || "(event)",
+          categoryId: ev.categoryId,
+          startDay,
+          endDay,
+          hPx: clamp(hPx, px(0.04), px(5)), // keep sane (up to 5 inches)
+          fontPx,
+        });
+
+        // advance to first day of next month
+        cur = new Date(y, m+1, 1); cur.setHours(0,0,0,0);
+      }
+    }
+    return segsByMonth;
+  }
+
+  function intervalsOverlap(a0,a1,b0,b1){
+    return !(a1 <= b0 || a0 >= b1);
+  }
+
+  function packSegments(dim, segments){
+    const gap = isFiniteNumber(state.settings.eventGapPx) ? Number(state.settings.eventGapPx) : 1.5;
+    const occ = Array.from({length:dim+1}, ()=>[]);
+    const sorted = segments.slice().sort((a,b)=>
+      (a.startDay - b.startDay) ||
+      (b.endDay - a.endDay) ||
+      (b.hPx - a.hPx) ||
+      String(a.eventId).localeCompare(String(b.eventId))
+    );
+
+    const placed = [];
+    let maxBottom = 0;
+
+    for(const seg of sorted){
+      const h = seg.hPx;
+      let y = 0;
+      let safety = 0;
+      while(true){
+        let nextY = y;
+        let conflict = false;
+        const y1 = y + h + gap;
+        for(let d=seg.startDay; d<=seg.endDay; d++){
+          const list = occ[d];
+          for(const it of list){
+            if(intervalsOverlap(y, y1, it.y0, it.y1)){
+              conflict = true;
+              nextY = Math.max(nextY, it.y1);
+            }
+          }
+        }
+        if(!conflict) break;
+        y = nextY;
+        if(++safety > 1000) break;
+      }
+      const y1 = y + h + gap;
+      for(let d=seg.startDay; d<=seg.endDay; d++){
+        occ[d].push({y0:y, y1});
+      }
+      placed.push({ ...seg, y0:y });
+      maxBottom = Math.max(maxBottom, y + h);
+    }
+
+    return { placed, heightPx: maxBottom };
+  }
+
+  function buildLayout(){
+    const y = state.year;
+    const s = state.settings;
+
+    const marginPx = px(s.marginIn);
+    const gapPx = px(s.gapIn);
+    const headerPx = px(s.headerIn);
+    const posterHpx = px(s.posterHeightIn);
+
+    const monthLabelWpx = px(s.monthLabelWidthIn);
+    const minDayLabelWpx = minDayLabelWidthPx(y, s.dayLabelPt);
+    const baseDayWpx = Math.max(px(s.dayWidthIn), minDayLabelWpx);
+
+    const dayLabelFontPx = (s.dayLabelPt * DPI) / 72;
+    const eventFontPxDefault = (s.eventFontPt * DPI) / 72;
+    const titleFontPx = (s.titleFontPt * DPI) / 72;
+
+    const minRowPx = px(s.minMonthRowIn);
+    const gridLineColor = (typeof s.gridLineColor === 'string' && s.gridLineColor) ? s.gridLineColor : "#d1d5db";
+    let _glw = parseFloat(String(s.gridLineWidthPx ?? 1));
+    if(!isFiniteNumber(_glw)) _glw = 1;
+    const gridLineWidthPx = clamp(_glw, 0.25, 4);
+
+    const bodyTop = marginPx + headerPx;
+    const rowsGapTotalPx = gapPx * 11;
+    const availableRowsPx = Math.max(0, posterHpx - marginPx*2 - headerPx - rowsGapTotalPx);
+
+    // Build event segments and pack for each month (used both for row sizing + drawing)
+    const segmentsByMonth = buildSegmentsByMonth();
+
+    const packedByMonth = Array.from({length:12}, ()=>({placed:[], heightPx:0}));
+
+    const requiredMin = [];
+    const labelBandPx = dayLabelFontPx * 1.6 + 6;
+    const pad = 2;
+
+    for(let m=0;m<12;m++){
+      const dim = daysInMonth(y,m);
+      const segs = segmentsByMonth[m];
+
+      // pack to remove gaps (this is the key fix)
+      const pack = segs.length ? packSegments(dim, segs) : {placed:[], heightPx:0};
+      packedByMonth[m] = pack;
+
+      // cell override height max
+      let maxOvHpx = 0;
+      for(let d=1; d<=dim; d++){
+        const ds = isoDateStr(y,m,d);
+        const ov = state.cellOverrides[ds];
+        if(ov && isFiniteNumber(ov.hIn)) maxOvHpx = Math.max(maxOvHpx, px(Number(ov.hIn)));
+      }
+
+      // baseline row height
+      const baseNeed = labelBandPx + pad*2 + Math.max(10, eventFontPxDefault*1.2 + 6);
+
+      const eventsNeed = labelBandPx + pad*2 + pack.heightPx;
+      const want = Math.max(minRowPx, maxOvHpx || 0, baseNeed, eventsNeed);
+      requiredMin.push(want);
+    }
+
+    const sumMin = requiredMin.reduce((a,b)=>a+b,0);
+    const weights = state.monthWeights.map(w => isFiniteNumber(+w) ? Math.max(0.1, +w) : 1);
+    const mode = (s.rowHeightMode === "compact") ? "compact" : "fill";
+
+    // Month row heights:
+    // - Fill: distribute rows to use the full poster height (good for sheets).
+    // - Compact: rows shrink to the minimum needed for their events/day-labels (leaves blank space at bottom).
+    let rowHeights = new Array(12).fill(0);
+
+    let hardMin = minRowPx;
+    if(hardMin * 12 > availableRowsPx){
+      hardMin = availableRowsPx / 12;
+    }
+
+    if(mode === "compact"){
+      // Minimum heights based on content; weights only add extra (never shrink below minimum).
+      for(let m=0;m<12;m++){
+        const mult = Math.max(1, weights[m]);
+        rowHeights[m] = Math.max(hardMin, requiredMin[m] * mult);
+      }
+
+      const sumRows = rowHeights.reduce((a,b)=>a+b,0);
+      // If content doesn't fit, scale down to fit (will trigger overflow warning).
+      if(sumRows > availableRowsPx && sumRows > 0){
+        const scale = availableRowsPx / sumRows;
+        for(let m=0;m<12;m++) rowHeights[m] *= scale;
+      }
+    } else {
+      // Fill poster height: distribute remaining space using weights & content needs, with a hard floor.
+      const availAfterMin = Math.max(0, availableRowsPx - hardMin * 12);
+
+      const targets = requiredMin.map((rm, i) => Math.max(1, rm) * weights[i]);
+      let sumT = targets.reduce((a,b)=>a+b,0);
+      if(sumT <= 0) sumT = 1;
+
+      for(let m=0;m<12;m++){
+        rowHeights[m] = hardMin + availAfterMin * (targets[m] / sumT);
+      }
+    }
+
+    // Overflow = at least one month row is smaller than its computed minimum needs.
+    // (User can fix by increasing poster height OR increasing that month's weight OR reducing event sizes.)
+    let overflow = (sumMin > availableRowsPx);
+    if(!overflow){
+      for(let m=0;m<12;m++){
+        if(rowHeights[m] + 0.5 < requiredMin[m]){
+          overflow = true;
+          break;
+        }
+      }
+    }
+
+    // Build rows + cells
+    const monthRows = [];
+    const cellsByMonth = Array.from({length:12}, ()=>[]);
+    const cellByDate = new Map();
+
+    let yCursor = bodyTop;
+    let maxRight = marginPx;
+
+    for(let m=0;m<12;m++){
+      const rowY = yCursor;
+      const rowH = rowHeights[m];
+      const dim = daysInMonth(y, m);
+
+      let xCursor = marginPx;
+
+      const labelBox = { x:xCursor, y:rowY, w:monthLabelWpx, h:rowH };
+      xCursor += monthLabelWpx;
+
+      xCursor += gapPx;
+
+      for(let d=1; d<=31; d++){
+        const ds = isoDateStr(y,m,d);
+        const valid = d <= dim;
+        const dt = valid ? new Date(y,m,d) : null;
+        if(dt) dt.setHours(0,0,0,0);
+
+        const ov = state.cellOverrides[ds] || {};
+        let wPx = isFiniteNumber(ov.wIn) ? px(Number(ov.wIn)) : baseDayWpx;
+        wPx = clamp(wPx, px(0.05), px(10));
+        wPx = Math.max(wPx, minDayLabelWpx);
+
+        const box = {
+          type: "cell",
+          dateStr: ds,
+          year: y,
+          month: m,
+          day: d,
+          valid,
+          weekday: dt ? weekdayShort(dt) : "",
+          x: xCursor,
+          y: rowY,
+          w: wPx,
+          h: rowH,
+        };
+        cellsByMonth[m].push(box);
+        cellByDate.set(ds, box);
+
+        xCursor += wPx;
+        if(d < 31) xCursor += gapPx;
+      }
+
+      const rowRight = xCursor;
+      maxRight = Math.max(maxRight, rowRight);
+
+      monthRows.push({
+        month: m,
+        y: rowY,
+        h: rowH,
+        labelBox,
+        right: rowRight,
+      });
+
+      yCursor += rowH + gapPx;
+    }
+
+    const posterWpx = maxRight + marginPx;
+
+    return {
+      overflow,
+      posterWpx,
+      posterHpx,
+      marginPx,
+      gapPx,
+      headerPx,
+      monthLabelWpx,
+      baseDayWpx,
+      gridLineColor,
+      gridLineWidthPx,
+      dayLabelFontPx,
+      eventFontPxDefault,
+      titleFontPx,
+      labelBandPx,
+      pad,
+      monthRows,
+      cellsByMonth,
+      cellByDate,
+      segmentsByMonth,
+      packedByMonth,
+      eventRects: [], // filled during draw
+    };
+  }
+
+  // --- SVG helpers
+  function svgEl(name, attrs={}, children=[]){
+    const el = document.createElementNS("http://www.w3.org/2000/svg", name);
+    for(const [k,v] of Object.entries(attrs)){
+      if(v == null) continue;
+      el.setAttribute(k, String(v));
+    }
+    for(const c of children){
+      el.appendChild(c);
+    }
+    return el;
+  }
+
+  function clearSvg(){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+  }
+
+  // --- Rendering
+  let renderQueued = false;
+  function scheduleRenderPoster(){
+    if(renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(()=>{
+      renderQueued = false;
+      renderPoster();
+      renderSelectionPanels();
+      renderWarnings();
+    });
+  }
+  function scheduleRenderAll(){
+    // render poster + sidebar lists
+    scheduleRenderPoster();
+    renderSidebarLists();
+  }
+
+  let currentLayout = null;
+
+  function renderPoster(){
+    const layout = buildLayout();
+    currentLayout = layout;
+
+    // Update poster info
+    posterInfo.textContent = `${state.year} · ${inches(layout.posterWpx).toFixed(2)}in × ${state.settings.posterHeightIn.toFixed(2)}in`;
+
+    // Apply zoom
+    posterInner.style.transform = `scale(${state.zoom})`;
+    zoomRange.value = String(state.zoom);
+
+    // Set SVG size for screen (px)
+    svg.setAttribute("width", String(layout.posterWpx));
+    svg.setAttribute("height", String(layout.posterHpx));
+    svg.setAttribute("viewBox", `0 0 ${layout.posterWpx} ${layout.posterHpx}`);
+
+    clearSvg();
+
+    // Background
+    svg.appendChild(svgEl("rect", { x:0, y:0, width:layout.posterWpx, height:layout.posterHpx, fill:"#ffffff" }));
+
+    // Title
+    if(layout.headerPx > 0){
+      const t = svgEl("text", {
+        x: layout.marginPx,
+        y: layout.marginPx + layout.titleFontPx,
+        "font-size": layout.titleFontPx,
+        "font-weight": 900,
+        fill: "#0b1020",
+      }, [document.createTextNode(String(state.year))]);
+      svg.appendChild(t);
+    }
+
+    // Build clipPaths for each month row
+    const defs = svgEl("defs");
+    for(const row of layout.monthRows){
+      const clipId = `clip-m-${row.month}`;
+      const yTop = row.y;
+      const h = row.h;
+      defs.appendChild(svgEl("clipPath", { id: clipId }, [
+        svgEl("rect", { x: layout.marginPx, y: yTop, width: (row.right - layout.marginPx), height: h })
+      ]));
+    }
+    svg.appendChild(defs);
+
+    // Grid + labels
+    const gridG = svgEl("g", { id:"grid" });
+
+    for(const row of layout.monthRows){
+      // month label box
+      gridG.appendChild(svgEl("rect", {
+        x: row.labelBox.x,
+        y: row.labelBox.y,
+        width: row.labelBox.w,
+        height: row.labelBox.h,
+        fill: "#f3f4f6",
+        stroke: layout.gridLineColor,
+        "stroke-width": layout.gridLineWidthPx,
+        rx: 10,
+        ry: 10,
+      }));
+
+      // month label text
+      gridG.appendChild(svgEl("text", {
+        x: row.labelBox.x + 10,
+        y: row.labelBox.y + layout.dayLabelFontPx + 10,
+        "font-size": layout.dayLabelFontPx + 2,
+        "font-weight": 900,
+        fill: "#0b1020",
+      }, [document.createTextNode(MONTHS[row.month])]));
+
+      // day cells
+      const cells = layout.cellsByMonth[row.month];
+      for(const cell of cells){
+        const fill = cell.valid ? "#ffffff" : "#f8fafc";
+        gridG.appendChild(svgEl("rect", {
+          x: cell.x,
+          y: cell.y,
+          width: cell.w,
+          height: cell.h,
+          fill,
+          stroke: layout.gridLineColor,
+          "stroke-width": layout.gridLineWidthPx,
+          rx: 8,
+          ry: 8,
+          "data-type": "cell",
+          "data-date": cell.dateStr,
+        }));
+
+        if(cell.valid){
+          const label = `${ordinal(cell.day)} ${cell.weekday}`;
+          gridG.appendChild(svgEl("text", {
+            x: cell.x + 4,
+            y: cell.y + layout.dayLabelFontPx + 6,
+            "font-size": layout.dayLabelFontPx,
+            "font-weight": 800,
+            fill: "#111827",
+          }, [document.createTextNode(label)]));
+        }
+      }
+    }
+    svg.appendChild(gridG);
+
+    // Events
+    svg.appendChild(drawEvents(layout));
+
+    // Selection overlay
+    svg.appendChild(drawSelectionOverlay(layout));
+
+    // Click handler for selecting cells (on background rects)
+    // Instead of individual listeners for performance, use event delegation:
+    // We'll attach once on svg via pointerdown in init.
+  }
+
+  function getCategoryColor(catId){
+    const c = state.categories.find(x => x.id === catId);
+    return c ? c.color : "#94a3b8";
+  }
+
+  function drawEvents(layout){
+    const g = svgEl("g", { id:"events" });
+
+    layout.eventRects = [];
+
+    for(let m=0;m<12;m++){
+      const row = layout.monthRows[m];
+      const dim = daysInMonth(state.year, m);
+      const cells = layout.cellsByMonth[m];
+      const pack = layout.packedByMonth[m];
+      if(!pack || !pack.placed || !pack.placed.length) continue;
+
+      const clipId = `clip-m-${m}`;
+      const monthG = svgEl("g", { "clip-path": `url(#${clipId})` });
+
+      for(const seg of pack.placed){
+        const startD = clamp(seg.startDay, 1, dim);
+        const endD = clamp(seg.endDay, 1, dim);
+        const startCell = cells[startD-1];
+        const endCell = cells[endD-1];
+        if(!startCell || !endCell) continue;
+
+        const x = startCell.x + 1;
+        const w = Math.max(2, (endCell.x + endCell.w) - startCell.x - 2);
+
+        const y0 = row.y + layout.labelBandPx + layout.pad + seg.y0;
+        const h = Math.max(2, seg.hPx);
+
+        const color = getCategoryColor(seg.categoryId);
+        const txtColor = textColorFor(color);
+
+        const rect = svgEl("rect", {
+          x, y: y0,
+          width: w,
+          height: h,
+          rx: 4,
+          ry: 4,
+          fill: color,
+          opacity: 0.92,
+          stroke: "#000000",
+          "stroke-opacity": 0.12,
+          "stroke-width": 1,
+        });
+
+        const group = svgEl("g", {
+          "data-type": "event",
+          "data-event-id": seg.eventId,
+          "data-month": String(m),
+          cursor: "grab",
+        }, [rect]);
+
+        // Label (auto-fit instead of hiding)
+        const mode = state.settings.eventLabelMode;
+        const pad = isFiniteNumber(state.settings.eventPadPx) ? Number(state.settings.eventPadPx) : 2.0;
+
+        const desiredFontPx = seg.fontPx || layout.eventFontPxDefault;
+        const minFontPx = (state.settings.minEventFontPt * DPI) / 72;
+
+        let fontPx = desiredFontPx;
+        if(mode === "auto"){
+          const scaleW = w / Math.max(1, desiredFontPx * 2.2);
+          const scaleH = h / Math.max(1, desiredFontPx * 1.1);
+          const scale = Math.min(1, scaleW, scaleH);
+          fontPx = clamp(desiredFontPx * scale, minFontPx, desiredFontPx);
+        }
+
+        const canShow = (mode === "never") ? false : (mode === "always" ? true : (w >= minFontPx*1.5 && h >= minFontPx*1.1));
+        if(canShow){
+          const innerPad = pad;
+          const maxChars = Math.max(3, Math.floor((w - innerPad*2) / (fontPx * 0.62)));
+          const maxLines = Math.max(1, Math.floor((h - innerPad*2) / (fontPx * 1.12)));
+          const lines = wrapLines(seg.title || "(event)", maxChars, Math.min(6, maxLines));
+          let ty = y0 + fontPx + 2;
+          for(const line of lines){
+            if(ty > y0 + h - 2) break;
+            group.appendChild(svgEl("text", {
+              x: x + innerPad,
+              y: ty,
+              fill: txtColor,
+              "font-size": fontPx,
+              "font-weight": 800,
+            }, [document.createTextNode(line)]));
+            ty += fontPx * 1.12;
+          }
+        }
+
+        // Pointerdown to select + drag move
+        group.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          selectEvent(seg.eventId, m);
+          startEventDrag(e, seg.eventId, m, "move");
+        }, {passive:false});
+
+        monthG.appendChild(group);
+
+        layout.eventRects.push({
+          eventId: seg.eventId,
+          month: m,
+          x, y: y0,
+          w, h,
+          startDay: startD,
+          endDay: endD,
+        });
+      }
+
+      g.appendChild(monthG);
+    }
+
+    return g;
+  }
+
+  function getSelectedCellDate(){
+    return state.selected.type === "cell" ? state.selected.id : null;
+  }
+  function getSelectedEventId(){
+    return state.selected.type === "event" ? state.selected.id : null;
+  }
+
+  function drawSelectionOverlay(layout){
+    const g = svgEl("g", { id:"selection" });
+
+    // Selected cell outline + resize handle
+    const selCell = getSelectedCellDate();
+    if(selCell){
+      const box = layout.cellByDate.get(selCell);
+      if(box && box.valid){
+        g.appendChild(svgEl("rect", {
+          x: box.x - 1,
+          y: box.y - 1,
+          width: box.w + 2,
+          height: box.h + 2,
+          rx: 8,
+          ry: 8,
+          fill: "none",
+          stroke: "#2563eb",
+          "stroke-width": 2,
+        }));
+
+        const hs = 10;
+        const handle = svgEl("rect", {
+          x: box.x + box.w - hs/2,
+          y: box.y + box.h - hs/2,
+          width: hs,
+          height: hs,
+          rx: 3,
+          ry: 3,
+          fill: "#2563eb",
+          stroke: "#ffffff",
+          "stroke-width": 2,
+          cursor: "nwse-resize",
+        });
+        handle.addEventListener("pointerdown", (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          startCellResizeDrag(e, box);
+        }, {passive:false});
+        g.appendChild(handle);
+      }
+    }
+
+    // Selected event outline + handles (month-local)
+    const selEvent = getSelectedEventId();
+    if(selEvent){
+      const selMonth = state.selected.month;
+      let rectInfo = null;
+      if(selMonth != null){
+        rectInfo = layout.eventRects.find(r => r.eventId === selEvent && r.month === selMonth) || null;
+      }
+      if(!rectInfo){
+        rectInfo = layout.eventRects.find(r => r.eventId === selEvent) || null;
+      }
+      if(rectInfo){
+        g.appendChild(svgEl("rect", {
+          x: rectInfo.x - 1,
+          y: rectInfo.y - 1,
+          width: rectInfo.w + 2,
+          height: rectInfo.h + 2,
+          rx: 6,
+          ry: 6,
+          fill: "none",
+          stroke: "#2563eb",
+          "stroke-width": 2,
+        }));
+
+        const hw = 8;
+        const hh = 18;
+
+        // left handle (resize start)
+        const hL = svgEl("rect", {
+          x: rectInfo.x - hw/2,
+          y: rectInfo.y + (rectInfo.h - hh)/2,
+          width: hw,
+          height: hh,
+          rx: 3,
+          ry: 3,
+          fill: "#2563eb",
+          stroke: "#ffffff",
+          "stroke-width": 2,
+          cursor: "ew-resize",
+        });
+        hL.addEventListener("pointerdown", (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          startEventDrag(e, selEvent, rectInfo.month, "resizeStart");
+        }, {passive:false});
+        g.appendChild(hL);
+
+        // right handle (resize end)
+        const hR = svgEl("rect", {
+          x: rectInfo.x + rectInfo.w - hw/2,
+          y: rectInfo.y + (rectInfo.h - hh)/2,
+          width: hw,
+          height: hh,
+          rx: 3,
+          ry: 3,
+          fill: "#2563eb",
+          stroke: "#ffffff",
+          "stroke-width": 2,
+          cursor: "ew-resize",
+        });
+        hR.addEventListener("pointerdown", (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          startEventDrag(e, selEvent, rectInfo.month, "resizeEnd");
+        }, {passive:false});
+        g.appendChild(hR);
+
+        // bottom handle (resize height)
+        const hb = svgEl("rect", {
+          x: rectInfo.x + rectInfo.w*0.25,
+          y: rectInfo.y + rectInfo.h - hw/2,
+          width: rectInfo.w*0.5,
+          height: hw,
+          rx: 3,
+          ry: 3,
+          fill: "#2563eb",
+          stroke: "#ffffff",
+          "stroke-width": 2,
+          cursor: "ns-resize",
+        });
+        hb.addEventListener("pointerdown", (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          startEventDrag(e, selEvent, rectInfo.month, "resizeHeight");
+        }, {passive:false});
+        g.appendChild(hb);
+
+        // corner handle (resize end + height)
+        const hc = svgEl("rect", {
+          x: rectInfo.x + rectInfo.w - hw/2,
+          y: rectInfo.y + rectInfo.h - hw/2,
+          width: hw,
+          height: hw,
+          rx: 3,
+          ry: 3,
+          fill: "#2563eb",
+          stroke: "#ffffff",
+          "stroke-width": 2,
+          cursor: "nwse-resize",
+        });
+        hc.addEventListener("pointerdown", (e)=>{
+          e.preventDefault(); e.stopPropagation();
+          startEventDrag(e, selEvent, rectInfo.month, "resizeCorner");
+        }, {passive:false});
+        g.appendChild(hc);
+      }
+    }
+
+    return g;
+  }
+
+  // --- Selection actions
+  function selectCell(dateStr){
+    state.selected = { type:"cell", id: dateStr, month:null };
+    saveState();
+    scheduleRenderAll();
+  }
+  function selectEvent(eventId, monthIndex){
+    state.selected = { type:"event", id: eventId, month: monthIndex };
+    saveState();
+    scheduleRenderAll();
+  }
+  function clearSelection(){
+    state.selected = { type:null, id:null, month:null };
+    saveState();
+    scheduleRenderAll();
+  }
+
+  // --- Warnings
+  function renderWarnings(){
+    const p = presetById(state.presetId);
+    const layout = currentLayout;
+    if(!layout) return;
+
+    const posterWIn = inches(layout.posterWpx);
+    const dayW = state.settings.dayWidthIn;
+
+    let warn = "";
+
+    if(p.kind === "sheet"){
+      const diff = Math.abs(posterWIn - p.w);
+      if(diff > 0.2){
+        warn += `This sheet preset is ${p.w}in wide, but your layout length is ${posterWIn.toFixed(2)}in.\nIt may clip when printing.\n\nTip: keep day widths small for sheets, or use a roll preset for unlimited length.`;
+      }
+    }
+
+    if(dayW < 0.20){
+      warn += (warn ? "\n\n" : "") + "Day cells are very narrow. Event text will auto-shrink, but for readability use a wider preset (Landscape) or a roll preset.";
+    }
+
+    if(layout.overflow){
+      warn += (warn ? "\n\n" : "") + "Some month rows are too short for their content (events may clip).\nIncrease poster height, or increase that month’s weight, or reduce event heights/fonts.";
+    }
+
+    if(warn){
+      sizeWarn.style.display = "block";
+      sizeWarn.textContent = warn;
+    } else {
+      sizeWarn.style.display = "none";
+      sizeWarn.textContent = "";
+    }
+  }
+
+  // --- Sidebar lists
+  function renderSidebarLists(){
+    // preset select
+    presetSelect.innerHTML = "";
+    for(const p of PAGE_PRESETS){
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.name;
+      if(p.id === state.presetId) opt.selected = true;
+      presetSelect.appendChild(opt);
+    }
+
+    // weights
+    weightsGrid.innerHTML = "";
+    for(let m=0;m<12;m++){
+      const wrap = document.createElement("div");
+      const lab = document.createElement("label");
+      lab.textContent = MONTHS[m].slice(0,3);
+      const inp = document.createElement("input");
+      inp.type = "number";
+      inp.step = "0.1";
+      inp.min = "0.1";
+      inp.value = String(state.monthWeights[m] ?? 1);
+      inp.addEventListener("change", ()=>{
+        const v = clamp(parseFloat(inp.value||"1"), 0.1, 10);
+        state.monthWeights[m] = v;
+        saveState();
+        scheduleRenderPoster();
+      });
+      wrap.appendChild(lab);
+      wrap.appendChild(inp);
+      weightsGrid.appendChild(wrap);
+    }
+
+    // categories
+    catsList.innerHTML = "";
+    for(const cat of state.categories){
+      const row = document.createElement("div");
+      row.className = "pill";
+      const left = document.createElement("div");
+      left.className = "left";
+
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = cat.color;
+
+      const info = document.createElement("div");
+      const t = document.createElement("div");
+      t.className = "title";
+      t.textContent = cat.name;
+      info.appendChild(t);
+
+      left.appendChild(dot);
+      left.appendChild(info);
+
+      const actions = document.createElement("div");
+      actions.className = "row";
+
+      const color = document.createElement("input");
+      color.type = "color";
+      color.value = cat.color;
+      color.style.width = "44px";
+      color.style.padding = "0";
+      color.style.height = "28px";
+      color.addEventListener("change", ()=>{
+        cat.color = color.value;
+        saveState();
+        scheduleRenderPoster();
+        renderSidebarLists();
+      });
+
+      const del = document.createElement("button");
+      del.className = "btn small danger";
+      del.textContent = "Del";
+      del.addEventListener("click", ()=>{
+        if(state.categories.length <= 1) return;
+        // reassign events using this category to first category
+        const fallback = state.categories.find(c => c.id !== cat.id);
+        for(const ev of state.events){
+          if(ev.categoryId === cat.id) ev.categoryId = fallback.id;
+        }
+        state.categories = state.categories.filter(c => c.id !== cat.id);
+        saveState();
+        scheduleRenderAll();
+      });
+
+      actions.appendChild(color);
+      actions.appendChild(del);
+
+      row.appendChild(left);
+      row.appendChild(actions);
+      catsList.appendChild(row);
+    }
+
+    // new event category select
+    newEvCat.innerHTML = "";
+    for(const cat of state.categories){
+      const opt = document.createElement("option");
+      opt.value = cat.id;
+      opt.textContent = cat.name;
+      newEvCat.appendChild(opt);
+    }
+
+    // events list
+    renderEventsList();
+
+    // inputs values (avoid overwriting while typing by only setting when not focused)
+    setIfNotFocused(yearInput, state.year);
+    setIfNotFocused(posterHeightInEl, state.settings.posterHeightIn);
+    setIfNotFocused(dayWidthInEl, state.settings.dayWidthIn);
+    setIfNotFocused(monthLabelWidthInEl, state.settings.monthLabelWidthIn);
+    setIfNotFocused(marginInEl, state.settings.marginIn);
+    setIfNotFocused(gapInEl, state.settings.gapIn);
+    setIfNotFocused(headerInEl, state.settings.headerIn);
+
+    setIfNotFocused(dayLabelPtEl, state.settings.dayLabelPt);
+    setIfNotFocused(eventFontPtEl, state.settings.eventFontPt);
+    setIfNotFocused(eventHeightInEl, (state.settings.eventHeightIn ?? ""));
+    setIfNotFocused(titleFontPtEl, state.settings.titleFontPt);
+    setIfNotFocused(minEventFontPtEl, state.settings.minEventFontPt);
+
+    setIfNotFocused(gridLineColorEl, state.settings.gridLineColor);
+    setIfNotFocused(gridLineWidthPxEl, state.settings.gridLineWidthPx);
+    setIfNotFocused(eventGapPxEl, state.settings.eventGapPx);
+    setIfNotFocused(eventPadPxEl, state.settings.eventPadPx);
+
+    eventLabelModeEl.value = state.settings.eventLabelMode;
+    if(rowHeightModeEl) rowHeightModeEl.value = (state.settings.rowHeightMode === "compact") ? "compact" : "fill";
+  }
+
+  function setIfNotFocused(input, value){
+    if(document.activeElement === input) return;
+    input.value = String(value);
+  }
+
+  function renderEventsList(){
+    if(!eventsList) return;
+
+    const q = (eventSearch && eventSearch.value ? String(eventSearch.value) : "").trim().toLowerCase();
+    eventsList.innerHTML = "";
+
+    if(eventSearchHint){
+      eventSearchHint.style.display = q ? "none" : "block";
+    }
+    if(!q) return;
+
+    const matches = state.events
+      .filter(ev => {
+        const title = (ev.title || "").toLowerCase();
+        const start = (ev.start || "").toLowerCase();
+        const end = (ev.end || ev.start || "").toLowerCase();
+        const catName = (state.categories.find(c => c.id === ev.categoryId)?.name || "").toLowerCase();
+        return title.includes(q) || start.includes(q) || end.includes(q) || catName.includes(q);
+      })
+      .sort((a,b)=> (a.start||"").localeCompare(b.start||""));
+
+    const LIMIT = 80;
+    if(matches.length > LIMIT){
+      const note = document.createElement("div");
+      note.className = "hint";
+      note.textContent = `Showing ${LIMIT} of ${matches.length} results. Refine your search to narrow it down.`;
+      eventsList.appendChild(note);
+    }
+
+    for(const ev of matches.slice(0, LIMIT)){
+      const row = document.createElement("div");
+      row.className = "pill";
+
+      const left = document.createElement("div");
+      left.className = "left";
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = getCategoryColor(ev.categoryId);
+
+      const info = document.createElement("div");
+      const t = document.createElement("div");
+      t.className = "title";
+      t.textContent = ev.title || "(event)";
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      sub.textContent = `${ev.start} → ${ev.end || ev.start}`;
+      info.appendChild(t);
+      info.appendChild(sub);
+
+      left.appendChild(dot);
+      left.appendChild(info);
+
+      const actions = document.createElement("div");
+      actions.className = "row";
+
+      const sel = document.createElement("button");
+      sel.className = "btn small";
+      sel.textContent = "Show";
+      sel.addEventListener("click", ()=>{
+        // select in month of start date if possible
+        const dt = parseIsoDate(ev.start);
+        const m = dt ? dt.getMonth() : 0;
+        selectEvent(ev.id, m);
+      });
+
+      const del = document.createElement("button");
+      del.className = "btn small danger";
+      del.textContent = "Del";
+      del.addEventListener("click", ()=>{
+        state.events = state.events.filter(x => x.id !== ev.id);
+        if(state.selected.type === "event" && state.selected.id === ev.id){
+          state.selected = { type:null, id:null, month:null };
+        }
+        saveState();
+        scheduleRenderAll();
+      });
+
+      actions.appendChild(sel);
+      actions.appendChild(del);
+
+      row.appendChild(left);
+      row.appendChild(actions);
+
+      eventsList.appendChild(row);
+    }
+  }
+
+  function renderSelectionPanels(){
+    // selected cell
+    const cellDate = getSelectedCellDate();
+    if(cellDate && currentLayout){
+      const box = currentLayout.cellByDate.get(cellDate);
+      if(box && box.valid){
+        selNone.style.display = "none";
+        selPanel.style.display = "block";
+        selDate.textContent = cellDate;
+
+        const ov = state.cellOverrides[cellDate] || {};
+        setIfNotFocused(selCellW, isFiniteNumber(ov.wIn) ? Number(ov.wIn).toFixed(2) : "");
+        setIfNotFocused(selCellH, isFiniteNumber(ov.hIn) ? Number(ov.hIn).toFixed(2) : "");
+      } else {
+        selNone.style.display = "block";
+        selPanel.style.display = "none";
+      }
+    } else {
+      selNone.style.display = "block";
+      selPanel.style.display = "none";
+    }
+
+    // selected event
+    const evId = getSelectedEventId();
+    if(evId){
+      const ev = state.events.find(x => x.id === evId);
+      if(ev){
+        selEvNone.style.display = "none";
+        selEvPanel.style.display = "block";
+
+        selEvTitle.textContent = `${ev.title || "(event)"} · ${ev.start} → ${ev.end || ev.start}`;
+
+        const st = ev.style || {};
+        const fontPt = isFiniteNumber(st.fontPt) ? st.fontPt : state.settings.eventFontPt;
+        const defaultAutoHIn = inches(Math.max(10, ((fontPt*DPI)/72)*1.25 + 6));
+        const hIn = isFiniteNumber(st.heightIn) ? st.heightIn : (isFiniteNumber(state.settings.eventHeightIn) ? state.settings.eventHeightIn : defaultAutoHIn);
+
+        setIfNotFocused(selEvFontPt, Number(fontPt).toFixed(1));
+        setIfNotFocused(selEvHeightIn, Number(hIn).toFixed(2));
+      } else {
+        selEvNone.style.display = "block";
+        selEvPanel.style.display = "none";
+      }
+    } else {
+      selEvNone.style.display = "block";
+      selEvPanel.style.display = "none";
+    }
+  }
+
+  // --- Zoom helpers
+  function zoomToFitWidth(){
+    if(!currentLayout) return;
+    const wrapW = posterWrap.clientWidth - 24; // padding
+    const needW = currentLayout.posterWpx;
+    if(needW <= 0) return;
+    const z = clamp(wrapW / needW, 0.15, 2.5);
+    state.zoom = z;
+    saveState();
+    scheduleRenderPoster();
+  }
+
+  // --- Drag UX lock
+  let drag = null;
+  let dragLock = null;
+
+  function beginDragLock(cursor){
+    if(dragLock) return;
+    dragLock = {
+      bodyCursor: document.body.style.cursor,
+      wrapOverflow: posterWrap.style.overflow,
+    };
+    document.body.classList.add("dragging");
+    document.body.style.cursor = cursor || "grabbing";
+    posterWrap.style.overflow = "hidden";
+
+    // Prevent selection during drag (belt + suspenders)
+    document.addEventListener("selectstart", preventSelect, true);
+    window.getSelection && window.getSelection().removeAllRanges();
+  }
+  function endDragLock(){
+    if(!dragLock) return;
+    document.body.style.cursor = dragLock.bodyCursor;
+    posterWrap.style.overflow = dragLock.wrapOverflow;
+    document.body.classList.remove("dragging");
+    document.removeEventListener("selectstart", preventSelect, true);
+    dragLock = null;
+  }
+  function preventSelect(e){ e.preventDefault(); }
+
+  function clientToSvgPoint(clientX, clientY, inv){
+    if(inv){
+      const p = new DOMPoint(clientX, clientY).matrixTransform(inv);
+      return {x:p.x, y:p.y};
+    }
+    // fallback
+    const r = svg.getBoundingClientRect();
+    return { x: clientX - r.left, y: clientY - r.top };
+  }
+
+  function monthFromY(layout, y){
+    for(const row of layout.monthRows){
+      if(y >= row.y && y <= row.y + row.h) return row.month;
+    }
+    if(y < layout.monthRows[0].y) return 0;
+    return 11;
+  }
+  function dayFromX(layout, monthIndex, x){
+    const cells = layout.cellsByMonth[monthIndex];
+    for(const cell of cells){
+      if(x >= cell.x && x <= cell.x + cell.w) return cell.day;
+    }
+    // clamp
+    if(x < cells[0].x) return 1;
+    return 31;
+  }
+
+  function clampEventToYear(start, end){
+    const y = state.year;
+    const yearStart = new Date(y,0,1); yearStart.setHours(0,0,0,0);
+    const yearEnd = new Date(y,11,31); yearEnd.setHours(0,0,0,0);
+
+    let s = start, e = end;
+    if(e < s){ const tmp = s; s = e; e = tmp; }
+    if(s < yearStart) s = yearStart;
+    if(e > yearEnd) e = yearEnd;
+    return { start:s, end:e };
+  }
+
+  function startCellResizeDrag(e, box){
+    e.preventDefault();
+    beginDragLock("nwse-resize");
+    svg.setPointerCapture(e.pointerId);
+
+    const inv = svg.getScreenCTM() ? svg.getScreenCTM().inverse() : null;
+    const start = clientToSvgPoint(e.clientX, e.clientY, inv);
+
+    const ov = state.cellOverrides[box.dateStr] || {};
+    const startW = px(isFiniteNumber(ov.wIn) ? Number(ov.wIn) : state.settings.dayWidthIn);
+    const startH = px(isFiniteNumber(ov.hIn) ? Number(ov.hIn) : inches(box.h));
+
+    drag = {
+      kind: "cell",
+      pointerId: e.pointerId,
+      inv,
+      dateStr: box.dateStr,
+      startPt: start,
+      startW,
+      startH,
+    };
+  }
+
+  function startEventDrag(e, eventId, monthIndex, mode){
+    const ev = state.events.find(x => x.id === eventId);
+    if(!ev) return;
+
+    const norm = normalizeEvent(ev);
+    if(!norm) return;
+
+    e.preventDefault();
+    let cursor = "grabbing";
+    if(mode === "resizeStart" || mode === "resizeEnd") cursor = "ew-resize";
+    else if(mode === "resizeHeight") cursor = "ns-resize";
+    else if(mode === "resizeCorner") cursor = "nwse-resize";
+    beginDragLock(cursor);
+    svg.setPointerCapture(e.pointerId);
+
+    const inv = svg.getScreenCTM() ? svg.getScreenCTM().inverse() : null;
+    const startPt = clientToSvgPoint(e.clientX, e.clientY, inv);
+
+    const layout = currentLayout || buildLayout();
+
+    // Map grab point to a date
+    const grabMonth = monthFromY(layout, startPt.y);
+    const grabDay = dayFromX(layout, grabMonth, startPt.x);
+    const grabDate = new Date(state.year, grabMonth, grabDay); grabDate.setHours(0,0,0,0);
+
+    const grabOffsetDays = daysDiff(grabDate, norm.start);
+    const durationDays = daysDiff(norm.end, norm.start);
+
+    const style = ev.style || {};
+    let startHeightPx = null;
+    if(currentLayout && currentLayout.eventRects){
+      const r = currentLayout.eventRects.find(x => x.eventId === eventId && x.month === monthIndex) ||
+                currentLayout.eventRects.find(x => x.eventId === eventId);
+      if(r) startHeightPx = r.h;
+    }
+    if(startHeightPx == null && isFiniteNumber(style.heightIn)) startHeightPx = px(Number(style.heightIn));
+
+    drag = {
+      kind: "event",
+      pointerId: e.pointerId,
+      inv,
+      mode,
+      eventId,
+      monthIndex,
+      startPt,
+      grabOffsetDays,
+      durationDays,
+      startStart: norm.start,
+      startEnd: norm.end,
+      startHeightPx,
+    };
+  }
+
+  function onDragMove(e){
+    if(!drag) return;
+    e.preventDefault();
+
+    const pt = clientToSvgPoint(e.clientX, e.clientY, drag.inv);
+
+    if(drag.kind === "cell"){
+      const dx = pt.x - drag.startPt.x;
+      const dy = pt.y - drag.startPt.y;
+      const newW = clamp(drag.startW + dx, px(0.05), px(20));
+      const newH = clamp(drag.startH + dy, px(0.2), px(20));
+
+      if(!state.cellOverrides[drag.dateStr]) state.cellOverrides[drag.dateStr] = {};
+      state.cellOverrides[drag.dateStr].wIn = inches(newW);
+      state.cellOverrides[drag.dateStr].hIn = inches(newH);
+      scheduleRenderPoster();
+      return;
+    }
+
+    if(drag.kind === "event"){
+      const ev = state.events.find(x => x.id === drag.eventId);
+      if(!ev) return;
+      const layout = currentLayout || buildLayout();
+
+      const style = ev.style || (ev.style = {});
+
+      if(drag.mode === "resizeHeight"){
+        const dy = pt.y - drag.startPt.y;
+        const base = (drag.startHeightPx != null) ? drag.startHeightPx : px(0.16);
+        const newH = clamp(base + dy, px(0.04), px(5));
+        style.heightIn = inches(newH);
+        scheduleRenderPoster();
+        return;
+      }
+
+      // map pointer to date
+      const m = monthFromY(layout, pt.y);
+      const d = dayFromX(layout, m, pt.x);
+      const date = new Date(state.year, m, d); date.setHours(0,0,0,0);
+
+      if(drag.mode === "resizeCorner"){
+        // height
+        const dy = pt.y - drag.startPt.y;
+        const base = (drag.startHeightPx != null) ? drag.startHeightPx : px(0.16);
+        const newH = clamp(base + dy, px(0.04), px(5));
+        style.heightIn = inches(newH);
+
+        // end date
+        let start = drag.startStart;
+        let newEnd = date;
+        if(newEnd < start) newEnd = start;
+        const clamped = clampEventToYear(start, newEnd);
+        ev.start = isoDateStr(clamped.start.getFullYear(), clamped.start.getMonth(), clamped.start.getDate());
+        ev.end = isoDateStr(clamped.end.getFullYear(), clamped.end.getMonth(), clamped.end.getDate());
+        scheduleRenderPoster();
+        return;
+      }
+
+      if(drag.mode === "move"){
+        const newStart = addDays(date, -drag.grabOffsetDays);
+        const newEnd = addDays(newStart, drag.durationDays);
+        const clamped = clampEventToYear(newStart, newEnd);
+        ev.start = isoDateStr(clamped.start.getFullYear(), clamped.start.getMonth(), clamped.start.getDate());
+        ev.end = isoDateStr(clamped.end.getFullYear(), clamped.end.getMonth(), clamped.end.getDate());
+        state.selected = { type:"event", id: ev.id, month: m };
+        scheduleRenderPoster();
+        return;
+      }
+
+      if(drag.mode === "resizeStart"){
+        let newStart = date;
+        let end = drag.startEnd;
+        if(newStart > end) newStart = end;
+        const clamped = clampEventToYear(newStart, end);
+        ev.start = isoDateStr(clamped.start.getFullYear(), clamped.start.getMonth(), clamped.start.getDate());
+        ev.end = isoDateStr(clamped.end.getFullYear(), clamped.end.getMonth(), clamped.end.getDate());
+        state.selected = { type:"event", id: ev.id, month: m };
+        scheduleRenderPoster();
+        return;
+      }
+
+      if(drag.mode === "resizeEnd"){
+        let start = drag.startStart;
+        let newEnd = date;
+        if(newEnd < start) newEnd = start;
+        const clamped = clampEventToYear(start, newEnd);
+        ev.start = isoDateStr(clamped.start.getFullYear(), clamped.start.getMonth(), clamped.start.getDate());
+        ev.end = isoDateStr(clamped.end.getFullYear(), clamped.end.getMonth(), clamped.end.getDate());
+        state.selected = { type:"event", id: ev.id, month: m };
+        scheduleRenderPoster();
+        return;
+      }
+    }
+  }
+
+  function onDragEnd(e){
+    if(!drag) return;
+    try{
+      svg.releasePointerCapture(drag.pointerId);
+    }catch(_){}
+    drag = null;
+    endDragLock();
+    saveState();
+    scheduleRenderAll();
+  }
+
+  // --- Event delegation for selecting cells/events
+  svg.addEventListener("pointerdown", (e)=>{
+    // if click on empty area, clear selection; if click on a cell rect, select it
+    const target = e.target;
+    if(!(target instanceof Element)) return;
+
+    const type = target.getAttribute("data-type");
+    if(type === "cell"){
+      const ds = target.getAttribute("data-date");
+      if(ds) selectCell(ds);
+      return;
+    }
+    // If clicked not on cell/event, clear selection
+    if(type == null){
+      clearSelection();
+    }
+  }, {passive:false});
+
+  // Drag listeners
+  svg.addEventListener("pointermove", onDragMove, {passive:false});
+  svg.addEventListener("pointerup", onDragEnd, {passive:false});
+  svg.addEventListener("pointercancel", onDragEnd, {passive:false});
+
+  // --- Controls wiring
+  presetSelect.addEventListener("change", ()=> applyPreset(presetSelect.value));
+  if(rowHeightModeEl){
+    rowHeightModeEl.addEventListener("change", ()=>{
+      state.settings.rowHeightMode = (rowHeightModeEl.value === "compact") ? "compact" : "fill";
+      saveState();
+      scheduleRenderPoster();
+      renderWarnings();
+    });
+  }
+  if(autoMinRowsBtn){
+    autoMinRowsBtn.addEventListener("click", ()=>{
+      // Clear manual cell height overrides (so rows can shrink to true minimum)
+      const co = state.cellOverrides || {};
+      for(const k of Object.keys(co)){
+        if(co[k] && typeof co[k] === "object"){
+          if("hIn" in co[k]) delete co[k].hIn;
+          if(Object.keys(co[k]).length === 0) delete co[k];
+        }
+      }
+      state.monthWeights = Array(12).fill(1);
+      state.settings.rowHeightMode = "compact";
+      saveState();
+      scheduleRenderAll();
+    });
+  }
+
+
+  yearInput.addEventListener("change", ()=>{
+    state.year = clamp(parseInt(yearInput.value||String(state.year),10), 1970, 2100);
+    saveState();
+    scheduleRenderAll();
+  });
+
+  posterHeightInEl.addEventListener("change", ()=>{
+    state.settings.posterHeightIn = clamp(parseFloat(posterHeightInEl.value||"24"), 1, 200);
+    state.presetId = "custom";
+    saveState();
+    scheduleRenderAll();
+  });
+
+  dayWidthInEl.addEventListener("change", ()=>{
+    state.settings.dayWidthIn = clamp(parseFloat(dayWidthInEl.value||"0.45"), 0.05, 5);
+    state.presetId = "custom";
+    saveState();
+    scheduleRenderAll();
+  });
+
+  monthLabelWidthInEl.addEventListener("change", ()=>{
+    state.settings.monthLabelWidthIn = clamp(parseFloat(monthLabelWidthInEl.value||"0.9"), 0.3, 5);
+    state.presetId = "custom";
+    saveState();
+    scheduleRenderAll();
+  });
+
+  marginInEl.addEventListener("change", ()=>{
+    state.settings.marginIn = clamp(parseFloat(marginInEl.value||"0.25"), 0, 5);
+    state.presetId = "custom";
+    saveState();
+    scheduleRenderAll();
+  });
+
+  gapInEl.addEventListener("change", ()=>{
+    state.settings.gapIn = clamp(parseFloat(gapInEl.value||"0.03"), 0, 0.5);
+    state.presetId = "custom";
+    saveState();
+    scheduleRenderAll();
+  });
+
+  headerInEl.addEventListener("change", ()=>{
+    state.settings.headerIn = clamp(parseFloat(headerInEl.value||"0.4"), 0, 3);
+    state.presetId = "custom";
+    saveState();
+    scheduleRenderAll();
+  });
+
+  dayLabelPtEl.addEventListener("change", ()=>{
+    state.settings.dayLabelPt = clamp(parseFloat(dayLabelPtEl.value||"8"), 3, 30);
+    saveState();
+    scheduleRenderAll();
+  });
+
+  eventFontPtEl.addEventListener("change", ()=>{
+    state.settings.eventFontPt = clamp(parseFloat(eventFontPtEl.value||"8"), 3, 40);
+    saveState();
+    scheduleRenderAll();
+  });
+  // Global event height (optional)
+  if(eventHeightInEl){
+    eventHeightInEl.addEventListener("change", ()=>{
+      const v = String(eventHeightInEl.value || "").trim();
+      if(!v){
+        state.settings.eventHeightIn = null; // auto
+      } else {
+        state.settings.eventHeightIn = clamp(parseFloat(v), 0.05, 5);
+      }
+      saveState();
+      scheduleRenderAll();
+    });
+  }
+
+  function applyGlobalEventStyle(opts){
+    const o = opts || {};
+    const applyFont = !!o.font;
+    const applyHeight = !!o.height;
+
+    for(const ev of state.events){
+      if(!ev.style || typeof ev.style !== "object") continue;
+      if(applyFont) delete ev.style.fontPt;
+      if(applyHeight) delete ev.style.heightIn;
+      if(Object.keys(ev.style).length === 0) delete ev.style;
+    }
+    saveState();
+    scheduleRenderAll();
+  }
+
+  if(applyEventFontAllBtn){
+    applyEventFontAllBtn.addEventListener("click", ()=> applyGlobalEventStyle({font:true}));
+  }
+  if(applyEventHeightAllBtn){
+    applyEventHeightAllBtn.addEventListener("click", ()=> applyGlobalEventStyle({height:true}));
+  }
+  if(applyEventAllBtn){
+    applyEventAllBtn.addEventListener("click", ()=> applyGlobalEventStyle({font:true, height:true}));
+  }
+
+
+
+  titleFontPtEl.addEventListener("change", ()=>{
+    state.settings.titleFontPt = clamp(parseFloat(titleFontPtEl.value||"16"), 6, 60);
+    saveState();
+    scheduleRenderAll();
+  });
+
+  minEventFontPtEl.addEventListener("change", ()=>{
+    state.settings.minEventFontPt = clamp(parseFloat(minEventFontPtEl.value||"5"), 2, 30);
+    saveState();
+    scheduleRenderAll();
+  });
+
+  eventLabelModeEl.addEventListener("change", ()=>{
+    state.settings.eventLabelMode = eventLabelModeEl.value;
+    saveState();
+    scheduleRenderAll();
+  });
+
+  gridLineColorEl.addEventListener("change", ()=>{
+    state.settings.gridLineColor = gridLineColorEl.value || "#d1d5db";
+    saveState();
+    scheduleRenderAll();
+  });
+
+  gridLineWidthPxEl.addEventListener("change", ()=>{
+    state.settings.gridLineWidthPx = clamp(parseFloat(gridLineWidthPxEl.value||"1"), 0.25, 4);
+    saveState();
+    scheduleRenderAll();
+  });
+
+  eventGapPxEl.addEventListener("change", ()=>{
+    state.settings.eventGapPx = clamp(parseFloat(eventGapPxEl.value||"1.5"), 0, 50);
+    saveState();
+    scheduleRenderAll();
+  });
+
+  eventPadPxEl.addEventListener("change", ()=>{
+    state.settings.eventPadPx = clamp(parseFloat(eventPadPxEl.value||"2"), 0, 30);
+    saveState();
+    scheduleRenderAll();
+  });
+
+  autoExpandLabelsBtn.addEventListener("click", ()=>{
+    autoExpandLongTitles();
+  });
+
+  if(eventSearch){
+    eventSearch.addEventListener("input", ()=>{
+      renderEventsList();
+    });
+  }
+
+
+  zoomRange.addEventListener("input", ()=>{
+    state.zoom = clamp(parseFloat(zoomRange.value||"1"), 0.15, 2.5);
+    saveState();
+    scheduleRenderPoster();
+  });
+  resetZoomBtn.addEventListener("click", ()=>{
+    state.zoom = 1;
+    saveState();
+    scheduleRenderPoster();
+  });
+  fitWidthBtn.addEventListener("click", zoomToFitWidth);
+
+  printBtn.addEventListener("click", ()=> window.print());
+
+  // Selected cell panel buttons
+  applyCellBtn.addEventListener("click", ()=>{
+    const ds = getSelectedCellDate();
+    if(!ds) return;
+    if(!state.cellOverrides[ds]) state.cellOverrides[ds] = {};
+    const w = parseFloat(selCellW.value||"");
+    const h = parseFloat(selCellH.value||"");
+    if(isFiniteNumber(w)) state.cellOverrides[ds].wIn = clamp(w, 0.05, 20);
+    else delete state.cellOverrides[ds].wIn;
+    if(isFiniteNumber(h)) state.cellOverrides[ds].hIn = clamp(h, 0.2, 50);
+    else delete state.cellOverrides[ds].hIn;
+    saveState();
+    scheduleRenderAll();
+  });
+  clearCellBtn.addEventListener("click", ()=>{
+    const ds = getSelectedCellDate();
+    if(!ds) return;
+    delete state.cellOverrides[ds];
+    saveState();
+    scheduleRenderAll();
+  });
+
+  // Categories
+  addCatBtn.addEventListener("click", ()=>{
+    const name = (newCatName.value||"").trim();
+    if(!name) return;
+    const color = newCatColor.value || "#2563eb";
+    state.categories.push({ id:"cat-"+uid(), name, color });
+    newCatName.value = "";
+    saveState();
+    scheduleRenderAll();
+  });
+
+  // Add event
+  addEventBtn.addEventListener("click", ()=>{
+    const title = (newEvTitle.value||"").trim();
+    const cat = newEvCat.value || (state.categories[0] ? state.categories[0].id : null);
+    const s = newEvStart.value || "";
+    const e = newEvEnd.value || s;
+    const sd = parseIsoDate(s);
+    const ed = parseIsoDate(e);
+    if(!sd || !ed || !cat) return;
+
+    const norm = (()=>{
+      let start = sd, end = ed;
+      if(end < start){ const t = start; start = end; end = t; }
+      return clampEventToYear(start, end);
+    })();
+
+    const ev = {
+      id: "ev-"+uid(),
+      title: title || "(event)",
+      start: isoDateStr(norm.start.getFullYear(), norm.start.getMonth(), norm.start.getDate()),
+      end: isoDateStr(norm.end.getFullYear(), norm.end.getMonth(), norm.end.getDate()),
+      categoryId: cat,
+      style: {},
+    };
+    state.events.push(ev);
+    newEvTitle.value = "";
+    saveState();
+    // select it
+    state.selected = { type:"event", id: ev.id, month: norm.start.getMonth() };
+    scheduleRenderAll();
+  });
+
+  // Selected event panel apply/delete
+  applyEvStyleBtn.addEventListener("click", ()=>{
+    const id = getSelectedEventId();
+    if(!id) return;
+    const ev = state.events.find(x => x.id === id);
+    if(!ev) return;
+    if(!ev.style) ev.style = {};
+    const fp = parseFloat(selEvFontPt.value||"");
+    const hi = parseFloat(selEvHeightIn.value||"");
+    if(isFiniteNumber(fp)) ev.style.fontPt = clamp(fp, 2, 80);
+    if(isFiniteNumber(hi)) ev.style.heightIn = clamp(hi, 0.04, 5);
+    saveState();
+    scheduleRenderAll();
+  });
+
+  deleteEvBtn.addEventListener("click", ()=>{
+    const id = getSelectedEventId();
+    if(!id) return;
+    state.events = state.events.filter(x => x.id !== id);
+    state.selected = { type:null, id:null, month:null };
+    saveState();
+    scheduleRenderAll();
+  });
+
+  // Export / import
+  exportJsonBtn.addEventListener("click", ()=>{
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+    download(`year-planner-${state.year}.json`, blob);
+  });
+  importJsonBtn.addEventListener("click", ()=> importFile.click());
+  importFile.addEventListener("change", async ()=>{
+    const f = importFile.files && importFile.files[0];
+    if(!f) return;
+    try{
+      const txt = await f.text();
+      const obj = JSON.parse(txt);
+      if(obj && typeof obj === 'object'){
+        state = { ...defaultState(), ...obj, settings:{...defaultState().settings, ...(obj.settings||{})} };
+        saveState();
+        scheduleRenderAll();
+        setTimeout(()=>zoomToFitWidth(), 100);
+      }
+    }catch(err){
+      alert("Could not import JSON.");
+    } finally {
+      importFile.value = "";
+    }
+  });
+
+  exportSvgBtn.addEventListener("click", ()=>{
+    // Clone current SVG and set physical size in inches
+    const layout = currentLayout || buildLayout();
+    const clone = svg.cloneNode(true);
+    // Remove UI-only selection overlay for cleaner exports
+    const _sel = clone.querySelector("#selLayer");
+    if(_sel) _sel.remove();
+
+    const wIn = inches(layout.posterWpx);
+    const hIn = state.settings.posterHeightIn;
+
+    clone.setAttribute("width", `${wIn}in`);
+    clone.setAttribute("height", `${hIn}in`);
+    clone.setAttribute("viewBox", `0 0 ${layout.posterWpx} ${layout.posterHpx}`);
+
+    // Serialize
+    const serializer = new XMLSerializer();
+    const svgText = serializer.serializeToString(clone);
+
+    const blob = new Blob([svgText], {type:"image/svg+xml"});
+    download(`year-planner-${state.year}.svg`, blob);
+  });
+
+  // --- Init defaults for date inputs
+  function setDefaultAddEventDates(){
+    const y = state.year;
+    const today = new Date();
+    if(today.getFullYear() === y){
+      const s = isoDateStr(y, today.getMonth(), today.getDate());
+      newEvStart.value = s;
+      newEvEnd.value = s;
+    } else {
+      newEvStart.value = isoDateStr(y, 0, 1);
+      newEvEnd.value = isoDateStr(y, 0, 1);
+    }
+  }
+
+  // --- Initial render
+  // If preset missing, set
+  if(!state.presetId) state.presetId = "roll-24";
+  const p0 = presetById(state.presetId);
+  if(p0.kind === "sheet"){
+    pageSizeStyle.textContent = `@media print{ @page{ size: ${p0.w}in ${p0.h}in; margin: 0; } }`;
+  } else {
+    pageSizeStyle.textContent = "@media print{ @page{ margin: 0; } }";
+  }
+
+  renderSidebarLists();
+  renderPoster();
+  renderSelectionPanels();
+  renderWarnings();
+  setDefaultAddEventDates();
+
+  setTimeout(()=>zoomToFitWidth(), 100);
+
+})();
+</script>
+</body>
+</html>
